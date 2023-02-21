@@ -18,6 +18,7 @@ struct DnsEntry
 
     std::string address;
     uint64_t lastUpdated;
+    bool preloaded = false;
 };
 
 
@@ -27,6 +28,7 @@ class DnsCache
     mutable std::shared_mutex sharedMutex;
     std::fstream cacheFile;
     std::string cacheFileName;
+    bool saveOnExit = false;
 
 public:
     DnsCache(const std::string &cacheFileName);
@@ -40,6 +42,7 @@ public:
     // in milliseconds
     static uint64_t getCurrentTimestamp() noexcept;
     void saveCacheToFile();
+    bool shouldSaveNewCacheFile() const noexcept { return saveOnExit; }
 
     const char entrySeparator= ' ';
 };

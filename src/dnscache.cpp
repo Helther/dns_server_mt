@@ -10,6 +10,7 @@ DnsCache::DnsCache(const std::string& cacheFileName)
     {
         std::cout << std::endl << "DNS cache not found, creating new file: " << cacheFileName << std::endl;
         cacheFile.open(cacheFileName, std::ios::out);
+        saveOnExit = true;
         if (!cacheFile.is_open())
             throw std::runtime_error("failed to create dns cache file");
     }
@@ -33,7 +34,7 @@ DnsCache::DnsCache(const std::string& cacheFileName)
             }
             std::string addrStr = line.substr(0, addrPos);
             std::string domainStr = line.substr(domainPos, line.size());
-            cache.emplace(domainStr, DnsEntry{addrStr, timestamp});
+            cache.emplace(domainStr, DnsEntry{addrStr, timestamp, true});
         }
     }
     cacheFile.close();
@@ -42,7 +43,8 @@ DnsCache::DnsCache(const std::string& cacheFileName)
 DnsCache::~DnsCache()
 {
     // save cache to hosts file
-    saveCacheToFile();
+    if (saveOnExit)
+        saveCacheToFile();
 }
 
 DnsEntry DnsCache::lookupEntry(const std::string &name) const noexcept

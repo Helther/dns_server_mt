@@ -26,7 +26,8 @@ void handleServerInterrupt(int sig)
 {
     std::weak_ptr<DnsCache> wptr = cache;
     if (auto sp = wptr.lock())
-        sp->saveCacheToFile();
+        if (sp->shouldSaveNewCacheFile())
+            sp->saveCacheToFile();
     exit(sig);
 }
 
@@ -69,20 +70,20 @@ int main(int argc, char* argv[])
                     throw std::runtime_error("Invalid forward server address");
 
                 fwdAddr = fwdStr.substr(0, separatorPos);
-                fwdServerAddr.sin_family = AF_INET;
-                if (inet_pton(AF_INET, fwdAddr.c_str(), &fwdServerAddr.sin_addr) != 1)
-                    throw std::runtime_error("Invalid forward server address");
 
                 fwdPort = atoi(fwdStr.substr(separatorPos + 1, fwdStr.size()).c_str());
-                checkPortValid(fwdPort);
-
-                fwdServerAddr.sin_port = htons(fwdPort);
             }
             else  // set default google DNS
             {
                 fwdAddr = "8.8.8.8";
                 fwdPort = 53;
             }
+            fwdServerAddr.sin_family = AF_INET;
+            if (inet_pton(AF_INET, fwdAddr.c_str(), &fwdServerAddr.sin_addr) != 1)
+                throw std::runtime_error("Invalid forward server address");
+            checkPortValid(fwdPort);
+
+            fwdServerAddr.sin_port = htons(fwdPort);
         } catch (std::runtime_error e) {
             throw std::runtime_error("Invalid arguments. " + std::string(e.what()) + '\n' + usage);
         }

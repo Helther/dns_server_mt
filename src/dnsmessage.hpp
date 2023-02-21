@@ -95,6 +95,7 @@ public:
 
     std::string toString() const noexcept;
     uint16_t getId() const noexcept { return header.id; }
+    DNSHeader::QR getQr() const noexcept { return static_cast<DNSHeader::QR>(header.qr); }
 
 protected:
     DNSMessage(){}

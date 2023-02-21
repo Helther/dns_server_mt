@@ -1,15 +1,11 @@
 #include "server.hpp"
-#include "dnsmessage.hpp"
 #include "dnsexception.hpp"
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <iostream>
 #include <unistd.h>
 #include <thread>
 #include <cstring>
 #include <arpa/inet.h>
-#include <sstream>
-#include <errno.h>
 
 
 Server::Server(std::shared_ptr<DnsCache> cachePtr, int port, const sockaddr_in &fwdSrvAddr, const std::string &fwdAddrStr, int fwdPort) :
@@ -69,19 +65,17 @@ void Server::requestProccessor(Server::RequestData data, std::shared_ptr<DnsCach
 {
     try {
         DNSQuery query(data.buffer.data(), data.size);
-        // log msg
-        std::string logQuery;
-        std::ostringstream ss(logQuery);
-        ss << query;
-        std::cout << "========Query info========" << ss.str();
+
+        logMessage<DNSQuery>(query);
 
         DnsEntry entry = cache->lookupEntry(query.getData().qName);
         uint64_t currentTime = DnsCache::getCurrentTimestamp();
         char responseBuffer[BUFF_SIZE];
         int bytesWritten = 0;
-        if (entry.isEmpty() || (currentTime - entry.lastUpdated > TIMEOUT_TIME))
-        {  // if not found in cache or cache entry time-outed
+        if (entry.isEmpty() || ((currentTime - entry.lastUpdated > TIMEOUT_TIME) && !entry.preloaded))
+        {  // if not found in cache or cache entry time-outed and is not preloaded from file
             // create socket for forward server and send the request
+            std::cout << "RequestProccessor get entry from Forward Server" << std::endl;
             int fwdSock = socket(AF_INET, SOCK_DGRAM, 0);
             if (fwdSock <= 0)
                 throw DNSException(DNSHeader::ServerFail, query.getId(), "Failed to create socket for Forward Server.");
@@ -105,28 +99,23 @@ void Server::requestProccessor(Server::RequestData data, std::shared_ptr<DnsCach
             auto fwdResponse = DNSResponse(DNSHeader::RCode::NoError, responseBuffer, resultBytes);
             std::memset(responseBuffer, 0, BUFF_SIZE);
             bytesWritten = fwdResponse.write(responseBuffer);
-            // log msg
-            std::string logResp;
-            std::ostringstream ss(logResp);
-            ss << fwdResponse;
-            std::cout << "========Response info========" << ss.str();
+
+            logMessage<DNSResponse>(fwdResponse);
 
             // update cache with one answer
             const auto newData = fwdResponse.getData();
             if (newData.rData.empty())
                 throw DNSException(DNSHeader::ServerFail, query.getId(), "Invalid response from Forward Server");
 
-            cache->updateOrInsertEntry(newData.name, DnsEntry{newData.rData.front(), currentTime});
+            cache->updateOrInsertEntry(newData.name, DnsEntry{newData.rData.front(), currentTime, false});
         }
         else
-        {
+        {  // send entry directly from cache
+            std::cout << "RequestProccessor get entry from cache" << std::endl;
             auto response = DNSResponse(DNSHeader::RCode::NoError, query, entry);
             bytesWritten = response.write(responseBuffer);
-            // log msg
-            std::string logResp;
-            std::ostringstream ss(logResp);
-            ss << response;
-            std::cout << "========Response info========" << ss.str();
+
+            logMessage<DNSResponse>(response);
         }
         int result = sendto(data.sockFD, responseBuffer, bytesWritten, 0, (struct sockaddr*) &data.clientAddr, sizeof(data.clientAddr));
         if (result == -1)

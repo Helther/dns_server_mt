@@ -1,4 +1,4 @@
-# DNS Server Multithreaded
+# DNS Server, Multithreaded
 Is a RFC 1035 compatible Domain Name System Server, that implements concurrent query processing
 and non-blocking cache read access, if available.
 ## Usage
@@ -8,7 +8,9 @@ $ dns_server port "hosts_file_path" "forward_server_addr:fwd_srv_port"(optional)
 ```
 where:
  * port - port number for listening
- * hosts_file_path - path for dns cache 
+ * hosts_file_path - path for initial dns cache, if file does not exist. 
+ It will be created and cache will be saved to it on server shutdown.
+ If file exists, entries will be cached and will not timeout, cache file won't be updated
  * forward_server_addr:fwd_srv_port - optional external DNS server, to forward queries to, 
  if cache entry is missing, default is Google DNS
  
@@ -18,7 +20,8 @@ $ dns_server 53 "hosts" "127.0.0.1:53"
 ```
 ## Features
  * Supports Normal Host Address Internet Queries and Responses
- * Implements DNS caching, in format of system [hosts example](hosts). Cache file is updated on server shutdown
+ * Implements DNS caching. Cache data is updated on timeout(ttl)
+ * Ability to preload cache from file in format of system [hosts example](hosts). These entries won't be updated on timeout
  * Supports forwarding queries to Forward Server, hence related argument option
 
 ## Dependencies
