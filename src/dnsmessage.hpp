@@ -84,7 +84,7 @@ struct ResponseData
     uint16_t dataClass;
     uint32_t ttl;
     uint16_t rLength;
-    std::string rData;
+    std::vector<std::string> rData;
 };
 
 
@@ -170,7 +170,8 @@ public:
         os << "\tCLASS: " << data.dataClass << std::endl;
         os << "\tTTL: " << data.ttl << std::endl;
         os << "\tRDLENGTH: " << data.rLength << std::endl;
-        os << "\tRDATA: " << data.rData << std::endl;
+        for (const auto& ans : data.rData)
+            os << "\tRDATA: " << ans << std::endl;
         os << "}" << std::endl;
         return os;
     }

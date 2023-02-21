@@ -3,12 +3,22 @@
 #include <signal.h>
 #include <memory>
 #include <arpa/inet.h>
+#include <array>
 
 void checkPortValid(int port)
 {
     if (port < 1 || port > 65535)
         throw std::runtime_error("Invalid port number");
 }
+
+static constexpr std::array<int, 6> SIGNALS_TO_INTERRUPT = {
+    SIGABRT,
+    SIGFPE,
+    SIGILL,
+    SIGINT,
+    SIGSEGV,
+    SIGTERM
+};
 
 std::shared_ptr<DnsCache> cache;
 
@@ -20,15 +30,20 @@ void handleServerInterrupt(int sig)
     exit(sig);
 }
 
+void setupSigHandlers(void(*handler)(int))
+{
+    struct sigaction sigIntHandler;
+    sigIntHandler.sa_handler = handler;
+    sigemptyset(&sigIntHandler.sa_mask);
+    sigIntHandler.sa_flags = 0;
+    for (const auto& sig : SIGNALS_TO_INTERRUPT)
+        sigaction(sig, &sigIntHandler, NULL);
+}
+
 
 int main(int argc, char* argv[])
 {
-    // handle manual server shutdown
-    struct sigaction sigIntHandler;
-    sigIntHandler.sa_handler = handleServerInterrupt;
-    sigemptyset(&sigIntHandler.sa_mask);
-    sigIntHandler.sa_flags = 0;
-    sigaction(SIGINT, &sigIntHandler, NULL);
+    setupSigHandlers(handleServerInterrupt);
 
     try
     {

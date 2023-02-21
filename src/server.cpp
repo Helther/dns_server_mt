@@ -105,9 +105,18 @@ void Server::requestProccessor(Server::RequestData data, std::shared_ptr<DnsCach
             auto fwdResponse = DNSResponse(DNSHeader::RCode::NoError, responseBuffer, resultBytes);
             std::memset(responseBuffer, 0, BUFF_SIZE);
             bytesWritten = fwdResponse.write(responseBuffer);
+            // log msg
+            std::string logResp;
+            std::ostringstream ss(logResp);
+            ss << fwdResponse;
+            std::cout << "========Response info========" << ss.str();
+
             // update cache with one answer
             const auto newData = fwdResponse.getData();
-            cache->updateOrInsertEntry(newData.name, DnsEntry{newData.rData, currentTime});
+            if (newData.rData.empty())
+                throw DNSException(DNSHeader::ServerFail, query.getId(), "Invalid response from Forward Server");
+
+            cache->updateOrInsertEntry(newData.name, DnsEntry{newData.rData.front(), currentTime});
         }
         else
         {

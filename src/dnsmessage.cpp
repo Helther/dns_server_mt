@@ -207,7 +207,7 @@ DNSResponse::DNSResponse(DNSHeader::RCode rCode, const DNSQuery& query, const Dn
     data.dataClass = queryData.qClass;
     data.ttl = TIMEOUT_TIME;
     data.rLength = 4;
-    data.rData = entry.address;
+    data.rData.emplace_back(entry.address);
 }
 
 DNSResponse::DNSResponse(DNSHeader::RCode rCode, const char *packet, int size)
@@ -217,22 +217,23 @@ DNSResponse::DNSResponse(DNSHeader::RCode rCode, const char *packet, int size)
         throw DNSException(static_cast<DNSHeader::RCode>(header.rcode), header.id, "Invalid Response from Forward Server.");
 
     header.qr = DNSHeader::QR::Response;
-    header.ra = 0;
     packet += DNSHeader::headerOffset;
     readLabel(packet, data.name);
     data.type = read16Bits(packet);
     data.dataClass = read16Bits(packet);
-    // TODO parse  all answers
-    packet += 2; // skip NAME offset
-    packet += 10; // skip TYPE, CLASS, TTL, RDLENGTH bit fields
-    data.ttl = 60;
-    data.rLength = 4;
-    in_addr addrN;
-    addrN.s_addr = read32Bits(packet, false);
-    char clientAddrStr[INET_ADDRSTRLEN];
-    data.rData = inet_ntop(AF_INET, &addrN.s_addr, clientAddrStr, INET_ADDRSTRLEN);
 
-    if (data.name.empty() || data.rData.empty())
+    for (int i = 0; i < header.ancount; ++i)
+    {
+        packet += 2; // skip NAME offset
+        packet += 10; // skip TYPE, CLASS, TTL, RDLENGTH bit fields
+        data.ttl = 60;
+        data.rLength = 4;
+        in_addr addrN;
+        addrN.s_addr = read32Bits(packet, false);
+        char clientAddrStr[INET_ADDRSTRLEN];
+        data.rData.emplace_back(inet_ntop(AF_INET, &addrN.s_addr, clientAddrStr, INET_ADDRSTRLEN));
+    }
+    if (data.name.empty() || data.rData.size() != header.ancount)
         throw std::runtime_error("Failed to parse answer from Forward Server");
 }
 
@@ -246,13 +247,16 @@ int DNSResponse::write(char* buffer) const
         writeLabel(buffer, data.name);
         write16Bits(buffer, data.type);
         write16Bits(buffer, data.dataClass);
-        // TODO write all answers
-        write16Bits(buffer, createNameOffset(DNSHeader::headerOffset)); // offset to qName
-        write16Bits(buffer, data.type);
-        write16Bits(buffer, data.dataClass);
-        write32Bits(buffer, data.ttl, false);
-        write16Bits(buffer, data.rLength);
-        writeIPString(buffer, data.rData);
+
+        for (const auto& ans : data.rData)
+        {
+            write16Bits(buffer, createNameOffset(DNSHeader::headerOffset)); // offset to qName
+            write16Bits(buffer, data.type);
+            write16Bits(buffer, data.dataClass);
+            write32Bits(buffer, data.ttl, false);
+            write16Bits(buffer, data.rLength);
+            writeIPString(buffer, ans);
+        }
     }
 
     return buffer - begin;
