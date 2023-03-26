@@ -20,8 +20,7 @@ Server::Server(std::shared_ptr<DnsCache> cachePtr, int port, const sockaddr_in &
     address.sin_port = htons(port);
     socketFD = makeUdpSocket(address);
 
-    std::string logStr;
-    std::ostringstream ss(logStr);
+    std::ostringstream ss;
     ss << "DNS Server is initialized. Listening on port: " << port << " sockFD: " << socketFD
         << ". Forward server: ip: " << fwdAddrStr << " port: " << fwdPort;
     Logger::instance().logInfo(ss.str());

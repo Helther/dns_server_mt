@@ -24,17 +24,25 @@ Logger::~Logger()
     keepProcessing.clear();
     Logger::instance().logInfo("logger shutdown");  // TODO called to wake up processThread to exit main loop, think of something better
     processingThread.join();
-    fileHandle.open(logFileName, std::ios::app);
-    while (!logQueue.empty())  // finish logging unprocessed tasks after thread shutdown
+    try
     {
-        auto task = logQueue.try_pop();
-        if (task)
+        fileHandle.open(logFileName, std::ios::app);
+        while (!logQueue.empty())  // finish logging unprocessed tasks after thread shutdown
         {
-            const std::string logMsg = getLogStr(*task);
-            Logger::instance().fileHandle.write(logMsg.data(), std::size(logMsg));
+            auto task = logQueue.try_pop();
+            if (task)
+            {
+                const std::string logMsg = getLogStr(*task);
+                    Logger::instance().fileHandle.write(logMsg.data(), std::size(logMsg));
+
+            }
         }
+        fileHandle.close();
+    } catch (std::exception& e) {
+        #ifndef NDEBUG
+        logToStdout(std::string("Error when writin log file: ") + e.what());
+        #endif
     }
-    fileHandle.close();
     #ifndef NDEBUG
     Logger::logToStdout("Logger destroyed");
     #endif

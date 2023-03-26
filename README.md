@@ -25,18 +25,18 @@ $ dns_server 53 "hosts" "127.0.0.1:53"
  * Supports forwarding queries to Forward Server, hence related argument option
 
 ## Dependencies
-1. A C++ compiler that supports C++17 standard.
+1. A C++ compiler that supports C++20 standard.
 The following compilers should work:
 
-  * [gcc 4+](https://gcc.gnu.org/)
+  * [gcc 8+](https://gcc.gnu.org/)
 
-  * [clang 7+](https://clang.llvm.org/)
+  * [clang 9+](https://clang.llvm.org/)
 
 2. [CMake 3.5+](https://cmake.org/)
 ## Build
 Target platform is Linux, POSIX is used. You can build main target via CMake.
 
-For example, from build directory:
+For example, from build directory call:
 ```
  $ cmake "path to the CMakeLists.txt" -DCMAKE_CXX_COMPILER:STRING=/usr/bin/clang++-11 -DCMAKE_BUILD_TYPE:String=Release
  $ make
