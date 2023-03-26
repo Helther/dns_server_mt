@@ -23,6 +23,7 @@ $ dns_server 53 "hosts" "127.0.0.1:53"
  * Implements DNS caching. Cache data is updated on timeout(ttl)
  * Ability to preload cache from file in format of system [hosts example](hosts). These entries won't be updated on timeout
  * Supports forwarding queries to Forward Server, hence related argument option
+ * File logging from a dedicated thread
 
 ## Dependencies
 1. A C++ compiler that supports C++20 standard.

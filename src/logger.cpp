@@ -27,15 +27,10 @@ Logger::~Logger()
     try
     {
         fileHandle.open(logFileName, std::ios::app);
-        while (!logQueue.empty())  // finish logging unprocessed tasks after thread shutdown
+        while (auto task = logQueue.try_pop())  // finish logging unprocessed tasks after thread shutdown
         {
-            auto task = logQueue.try_pop();
-            if (task)
-            {
-                const std::string logMsg = getLogStr(*task);
-                    Logger::instance().fileHandle.write(logMsg.data(), std::size(logMsg));
-
-            }
+            const std::string logMsg = getLogStr(*task);
+            Logger::instance().fileHandle.write(logMsg.data(), std::size(logMsg));
         }
         fileHandle.close();
     } catch (std::exception& e) {
