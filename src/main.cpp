@@ -1,9 +1,11 @@
 #include "server.hpp"
-#include <iostream>
+#include "logger.hpp"
+#include <exception>
 #include <signal.h>
 #include <memory>
 #include <arpa/inet.h>
 #include <array>
+
 
 void checkPortValid(int port)
 {
@@ -28,6 +30,8 @@ void handleServerInterrupt(int sig)
     if (auto sp = wptr.lock())
         if (sp->shouldSaveNewCacheFile())
             sp->saveCacheToFile();
+    cache.reset();
+    // TODO server and cache objects do not actually destroy here
     exit(sig);
 }
 
@@ -38,18 +42,21 @@ void setupSigHandlers(void(*handler)(int))
     sigemptyset(&sigIntHandler.sa_mask);
     sigIntHandler.sa_flags = 0;
     for (const auto& sig : SIGNALS_TO_INTERRUPT)
-        sigaction(sig, &sigIntHandler, NULL);
+        if (sigaction(sig, &sigIntHandler, NULL) == -1)
+            throw std::runtime_error("Failed to set signal handler");
 }
 
 
 int main(int argc, char* argv[])
 {
-    setupSigHandlers(handleServerInterrupt);
+    Logger::instance().setLevel(LogLevel::DEBUG);  // let's first init logger
 
     try
     {
+        setupSigHandlers(handleServerInterrupt);
+
         // parse args
-        const std::string usage("Usage: dns_server port \"hosts_file_path\" \"forward_server_addr:fwd_srv_port\"(optional)\n");
+        const std::string usage("Usage: dns_server port \"hosts_file_path\" \"forward_server_addr:fwd_srv_port\"(optional)");
         std::string hosts;
         std::string fwdAddr;
         int port, fwdPort;
@@ -79,7 +86,7 @@ int main(int argc, char* argv[])
                 fwdPort = 53;
             }
             fwdServerAddr.sin_family = AF_INET;
-            if (inet_pton(AF_INET, fwdAddr.c_str(), &fwdServerAddr.sin_addr) != 1)
+            if (inet_pton(fwdServerAddr.sin_family, fwdAddr.c_str(), &fwdServerAddr.sin_addr) != 1)
                 throw std::runtime_error("Invalid forward server address");
             checkPortValid(fwdPort);
 
@@ -96,7 +103,10 @@ int main(int argc, char* argv[])
     }
     catch (std::runtime_error& e)
     {
-        std::cout << "Exception caught: " << e.what() << std::endl;
+        #ifndef NDEBUG
+        Logger::instance().logToStdout(e.what());
+        #endif
+        Logger::instance().logError(e.what());
     }
     return 0;
 }

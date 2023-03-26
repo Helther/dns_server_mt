@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include "dnsmessage.hpp"
 
 class DNSException : public std::exception
@@ -29,7 +30,7 @@ public:
         default:
             return "Unknown Exception.";
         }
-        return result.append(info).c_str();
+        return result.append(" Message id: " + std::to_string(id) + ". " + info).c_str();
     }
     
     DNSHeader::RCode code;

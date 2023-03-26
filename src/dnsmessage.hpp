@@ -133,7 +133,7 @@ public:
         os << "\n\tQuestion\n\tQNAME: " << data.qName << std::endl;
         os << "\tQTYPE: " << data.qType << std::endl;
         os << "\tQCLASS: " << data.qClass << std::endl;
-        os << "}" << std::endl;
+        os << "}";
         return os;
     }
 
@@ -173,7 +173,7 @@ public:
         os << "\tRDLENGTH: " << data.rLength << std::endl;
         for (const auto& ans : data.rData)
             os << "\tRDATA: " << ans << std::endl;
-        os << "}" << std::endl;
+        os << "}";
         return os;
     }
 

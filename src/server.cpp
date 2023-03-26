@@ -1,11 +1,15 @@
 #include "server.hpp"
 #include "dnsexception.hpp"
+#include "logger.hpp"
+#include <exception>
+#include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <thread>
 #include <cstring>
 #include <arpa/inet.h>
+#include <sstream>
 
 
 Server::Server(std::shared_ptr<DnsCache> cachePtr, int port, const sockaddr_in &fwdSrvAddr, const std::string &fwdAddrStr, int fwdPort) :
@@ -16,34 +20,61 @@ Server::Server(std::shared_ptr<DnsCache> cachePtr, int port, const sockaddr_in &
     address.sin_port = htons(port);
     socketFD = makeUdpSocket(address);
 
-
-    std::cout << "DNS Server is initialized. Listening on port: " << port << " sockFD: " << socketFD << std::endl
-        << "Forward server: ip: " << fwdAddrStr << " port: " << fwdPort << std::endl;
+    std::string logStr;
+    std::ostringstream ss(logStr);
+    ss << "DNS Server is initialized. Listening on port: " << port << " sockFD: " << socketFD
+        << ". Forward server: ip: " << fwdAddrStr << " port: " << fwdPort;
+    Logger::instance().logInfo(ss.str());
+    #ifndef NDEBUG
+    Logger::logToStdout(ss.str());
+    #endif
 }
 
 Server::~Server()
 {
     close(socketFD);
-    std::cout << "DNS Server shutdown\n";
+
+    const std::string logMsg = "DNS Server shutdown";
+    Logger::instance().logInfo(logMsg);
+    #ifndef NDEBUG
+    Logger::logToStdout(logMsg);
+    #endif
 }
 
 void Server::run()
 {
-    std::cout << "DNS Server is running\n";
+    const std::string logMsg = "DNS Server is running";
+    Logger::instance().logInfo(logMsg);
+    #ifndef NDEBUG
+    Logger::logToStdout(logMsg);
+    #endif
 
     struct sockaddr_in clientAddr;
     socklen_t clientAddrLen = sizeof (clientAddr);
     char buffer[BUFF_SIZE];
     while(true)
     {
-        int requestSize = recvfrom(socketFD, buffer, BUFF_SIZE, 0, (struct sockaddr*) &clientAddr, &clientAddrLen);
-        char clientAddrStr[INET_ADDRSTRLEN];
-        inet_ntop(AF_INET, &clientAddr.sin_addr, clientAddrStr, INET_ADDRSTRLEN);
-        std::cout << "DNS Server received request from " << clientAddrStr << ", with size: " << requestSize << std::endl;
-        std::array<char, BUFF_SIZE> arr;
-        std::copy(buffer, buffer + BUFF_SIZE, arr.data());
-        std::thread(requestProccessor, RequestData{socketFD, arr, requestSize, clientAddr, fwdServerAddr}, cache).detach();
-        std::memset(buffer, 0, BUFF_SIZE);
+        try
+        {
+            int requestSize = recvfrom(socketFD, buffer, BUFF_SIZE, 0, (struct sockaddr*) &clientAddr, &clientAddrLen);
+            char clientAddrStr[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &clientAddr.sin_addr, clientAddrStr, INET_ADDRSTRLEN);
+            std::array<char, BUFF_SIZE> arr;
+            std::copy(buffer, buffer + BUFF_SIZE, arr.data());
+            std::thread(requestProcessor, RequestData{socketFD, arr, requestSize, clientAddr, fwdServerAddr}, cache).detach();
+            std::memset(buffer, 0, BUFF_SIZE);
+            const std::string logMsg("DNS Server received request from " + std::string(clientAddrStr) + ", with size: " + std::to_string(requestSize));
+            Logger::instance().logInfo(logMsg);
+            #ifndef NDEBUG
+            Logger::logToStdout(logMsg);
+            #endif
+        } catch (std::exception& e) {
+            const std::string logMsg(std::string("DNS Server Error receiving request") + e.what());
+            Logger::instance().logError(logMsg);
+            #ifndef NDEBUG
+            Logger::logToStdout(logMsg);
+            #endif
+        }
     }
 }
 
@@ -61,7 +92,7 @@ int Server::makeUdpSocket(const sockaddr_in &addr)
     return socketFD;
 }
 
-void Server::requestProccessor(Server::RequestData data, std::shared_ptr<DnsCache> cache)
+void Server::requestProcessor(Server::RequestData data, std::shared_ptr<DnsCache> cache) noexcept
 {
     try {
         DNSQuery query(data.buffer.data(), data.size);
@@ -75,7 +106,11 @@ void Server::requestProccessor(Server::RequestData data, std::shared_ptr<DnsCach
         if (entry.isEmpty() || ((currentTime - entry.lastUpdated > TIMEOUT_TIME) && !entry.preloaded))
         {  // if not found in cache or cache entry time-outed and is not preloaded from file
             // create socket for forward server and send the request
-            std::cout << "RequestProccessor get entry from Forward Server" << std::endl;
+            const std::string logMsg("RequestProccessor get entry from Forward Server");
+            Logger::instance().logInfo(logMsg);
+            #ifndef NDEBUG
+            Logger::logToStdout(logMsg);
+            #endif
             int fwdSock = socket(AF_INET, SOCK_DGRAM, 0);
             if (fwdSock <= 0)
                 throw DNSException(DNSHeader::ServerFail, query.getId(), "Failed to create socket for Forward Server.");
@@ -111,7 +146,11 @@ void Server::requestProccessor(Server::RequestData data, std::shared_ptr<DnsCach
         }
         else
         {  // send entry directly from cache
-            std::cout << "RequestProccessor get entry from cache" << std::endl;
+            const std::string logMsg("RequestProccessor get entry from cache");
+            Logger::instance().logInfo(logMsg);
+            #ifndef NDEBUG
+            Logger::logToStdout(logMsg);
+            #endif
             auto response = DNSResponse(DNSHeader::RCode::NoError, query, entry);
             bytesWritten = response.write(responseBuffer);
 
@@ -122,14 +161,28 @@ void Server::requestProccessor(Server::RequestData data, std::shared_ptr<DnsCach
             throw std::runtime_error("Failed to send response to client.");
 
     } catch (DNSException& e) {
-        std::cout << "RequestProccessor Caught DNS Exception: " << e.what() << std::endl;
+        const std::string logMsg(std::string("RequestProccessor Caught DNS Exception: ") + e.what());
+        Logger::instance().logError(logMsg);
+        #ifndef NDEBUG
+        Logger::logToStdout(logMsg);
+        #endif
         auto response = DNSResponse(e.code, e.id);
         char responseBuffer[BUFF_SIZE];
         int bytesWritten = response.write(responseBuffer);
         int result = sendto(data.sockFD, responseBuffer, bytesWritten, 0, (struct sockaddr*) &data.clientAddr, sizeof(data.clientAddr));
         if (result == -1)
-            throw std::runtime_error("Failed to send error response to client.");
+        {
+            const std::string logMsg(std::string( "RequestProccessor Error sending error responce to client"));
+            Logger::instance().logError(logMsg);
+            #ifndef NDEBUG
+            Logger::logToStdout(logMsg);
+            #endif
+        }
     } catch (std::exception& e) {
-        std::cout << "RequestProccessor Caught Unhandled Exception: " << e.what() << std::endl;
+        const std::string logMsg(std::string( "RequestProccessor Caught Unhandled Exception: ") + e.what());
+        Logger::instance().logError(logMsg);
+        #ifndef NDEBUG
+        Logger::logToStdout(logMsg);
+        #endif
     }
 }

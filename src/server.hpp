@@ -2,6 +2,7 @@
 
 #include "dnscache.hpp"
 #include "dnsmessage.hpp"
+#include "logger.hpp"
 #include <netinet/in.h>
 #include <array>
 #include <memory>
@@ -30,15 +31,19 @@ public:
     static int makeUdpSocket(const struct sockaddr_in& addr);
 
 private:
-    static void requestProccessor(RequestData data, std::shared_ptr<DnsCache> cache);
+    static void requestProcessor(RequestData data, std::shared_ptr<DnsCache> cache) noexcept;
 
     template<typename Msg>
     static void logMessage(const Msg& msg) noexcept
     {
-        std::string logResp;
-        std::ostringstream ss(logResp);
+        std::ostringstream ss;
         ss << msg;
-        std::cout << (msg.getQr() == DNSHeader::Query ? "========Query info========" : "========Response info========") << ss.str();
+        std::string logMsg(msg.getQr() == DNSHeader::Query ? "========Query info========" : "========Response info========");
+        logMsg.append(ss.str());
+        Logger::instance().logDebug(logMsg);
+        #ifndef NDEBUG
+        Logger::logToStdout(logMsg);
+        #endif
     }
 
     std::shared_ptr<DnsCache> cache;

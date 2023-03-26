@@ -1,6 +1,8 @@
 #include "dnscache.hpp"
 #include <chrono>
 #include <iostream>
+#include "logger.hpp"
+
 
 DnsCache::DnsCache(const std::string& cacheFileName)
 {
@@ -8,7 +10,11 @@ DnsCache::DnsCache(const std::string& cacheFileName)
     cacheFile.open(this->cacheFileName, std::ios::in);
     if (!cacheFile.is_open())
     {
-        std::cout << std::endl << "DNS cache not found, creating new file: " << cacheFileName << std::endl;
+        const std::string logMsg("DNS cache not found, creating new file: " + cacheFileName);
+        Logger::instance().logInfo(logMsg);
+        #ifndef NDEBUG
+        Logger::logToStdout(logMsg);
+        #endif
         cacheFile.open(cacheFileName, std::ios::out);
         saveOnExit = true;
         if (!cacheFile.is_open())
@@ -38,6 +44,9 @@ DnsCache::DnsCache(const std::string& cacheFileName)
         }
     }
     cacheFile.close();
+    #ifndef NDEBUG
+    Logger::logToStdout("DnsCache created");
+    #endif
 }
 
 DnsCache::~DnsCache()
@@ -45,6 +54,9 @@ DnsCache::~DnsCache()
     // save cache to hosts file
     if (saveOnExit)
         saveCacheToFile();
+    #ifndef NDEBUG
+    Logger::logToStdout("DnsCache destroyed");
+    #endif
 }
 
 DnsEntry DnsCache::lookupEntry(const std::string &name) const noexcept
@@ -71,7 +83,11 @@ void DnsCache::saveCacheToFile()
     cacheFile.open(cacheFileName, std::ios::out | std::ios::trunc);
     if (!cacheFile.is_open())
     {
-        std::cout << std::endl << "DNS cache failed to write to file " << cacheFileName << std::endl; 
+        const std::string logMsg("DNS failed to write to file: " + cacheFileName);
+        Logger::instance().logWarning(logMsg);
+        #ifndef NDEBUG
+        Logger::logToStdout(logMsg);
+        #endif
         return;
     }
     std::shared_lock lk(sharedMutex);
@@ -79,5 +95,10 @@ void DnsCache::saveCacheToFile()
         cacheFile << entry.second.address << ' ' << entry.first << std::endl;
     lk.unlock();
     cacheFile.close();
-    std::cout << std::endl << "DNS cache written to file " << cacheFileName << std::endl; 
+
+    const std::string logMsg("DNS cache written to file: " + cacheFileName);
+    Logger::instance().logInfo(logMsg);
+    #ifndef NDEBUG
+    Logger::logToStdout(logMsg);
+    #endif
 }
