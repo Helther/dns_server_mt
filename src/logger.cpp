@@ -12,7 +12,6 @@ Logger::Logger()
     fileHandle.exceptions(std::ofstream::failbit | std::ofstream::badbit);
     fileHandle.open(logFileName, std::ios::app);  // create file if doesn't exist
     fileHandle.close();
-    keepProcessing.test_and_set();
     processingThread = std::thread(processLogRequests);
     #ifndef NDEBUG
     Logger::logToStdout("Logger created");
@@ -21,7 +20,7 @@ Logger::Logger()
 
 Logger::~Logger()
 {
-    keepProcessing.clear();
+    keepProcessing = false;
     Logger::instance().logInfo("logger shutdown");  // TODO called to wake up processThread to exit main loop, think of something better
     processingThread.join();
     try
@@ -45,7 +44,7 @@ Logger::~Logger()
 
 void Logger::processLogRequests() noexcept
 {
-    while(Logger::instance().keepProcessing.test())
+    while(Logger::instance().keepProcessing)
     {
         LogTask task;
         Logger::instance().logQueue.wait_pop(task);

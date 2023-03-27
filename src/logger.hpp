@@ -57,7 +57,7 @@ class Logger
     static constexpr auto separator = " - ";
     ThreadSafeQueue<LogTask> logQueue;
     std::thread processingThread;
-    std::atomic_flag keepProcessing = ATOMIC_FLAG_INIT;
+    std::atomic_bool keepProcessing{true};
 
 public:
     // wait for processing thread to finish current queue and exit
