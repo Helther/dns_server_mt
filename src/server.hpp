@@ -40,10 +40,8 @@ private:
         ss << msg;
         std::string logMsg(msg.getQr() == DNSHeader::Query ? "========Query info========" : "========Response info========");
         logMsg.append(ss.str());
-        Logger::instance().logDebug(logMsg);
-        #ifndef NDEBUG
+        Logger::logDebug(logMsg);
         Logger::logToStdout(logMsg);
-        #endif
     }
 
     std::shared_ptr<DnsCache> cache;

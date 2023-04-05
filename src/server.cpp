@@ -23,10 +23,8 @@ Server::Server(std::shared_ptr<DnsCache> cachePtr, int port, const sockaddr_in &
     std::ostringstream ss;
     ss << "DNS Server is initialized. Listening on port: " << port << " sockFD: " << socketFD
         << ". Forward server: ip: " << fwdAddrStr << " port: " << fwdPort;
-    Logger::instance().logInfo(ss.str());
-    #ifndef NDEBUG
+    Logger::logInfo(ss.str());
     Logger::logToStdout(ss.str());
-    #endif
 }
 
 Server::~Server()
@@ -34,19 +32,15 @@ Server::~Server()
     close(socketFD);
 
     const std::string logMsg = "DNS Server shutdown";
-    Logger::instance().logInfo(logMsg);
-    #ifndef NDEBUG
+    Logger::logInfo(logMsg);
     Logger::logToStdout(logMsg);
-    #endif
 }
 
 void Server::run()
 {
     const std::string logMsg = "DNS Server is running";
-    Logger::instance().logInfo(logMsg);
-    #ifndef NDEBUG
+    Logger::logInfo(logMsg);
     Logger::logToStdout(logMsg);
-    #endif
 
     struct sockaddr_in clientAddr;
     socklen_t clientAddrLen = sizeof (clientAddr);
@@ -63,16 +57,12 @@ void Server::run()
             std::thread(requestProcessor, RequestData{socketFD, arr, requestSize, clientAddr, fwdServerAddr}, cache).detach();
             std::memset(buffer, 0, BUFF_SIZE);
             const std::string logMsg("DNS Server received request from " + std::string(clientAddrStr) + ", with size: " + std::to_string(requestSize));
-            Logger::instance().logInfo(logMsg);
-            #ifndef NDEBUG
+            Logger::logInfo(logMsg);
             Logger::logToStdout(logMsg);
-            #endif
         } catch (std::exception& e) {
             const std::string logMsg(std::string("DNS Server Error receiving request") + e.what());
-            Logger::instance().logError(logMsg);
-            #ifndef NDEBUG
+            Logger::logError(logMsg);
             Logger::logToStdout(logMsg);
-            #endif
         }
     }
 }
@@ -106,10 +96,9 @@ void Server::requestProcessor(Server::RequestData data, std::shared_ptr<DnsCache
         {  // if not found in cache or cache entry time-outed and is not preloaded from file
             // create socket for forward server and send the request
             const std::string logMsg("RequestProccessor get entry from Forward Server");
-            Logger::instance().logInfo(logMsg);
-            #ifndef NDEBUG
+            Logger::logInfo(logMsg);
             Logger::logToStdout(logMsg);
-            #endif
+
             int fwdSock = socket(AF_INET, SOCK_DGRAM, 0);
             if (fwdSock <= 0)
                 throw DNSException(DNSHeader::ServerFail, query.getId(), "Failed to create socket for Forward Server.");
@@ -146,10 +135,9 @@ void Server::requestProcessor(Server::RequestData data, std::shared_ptr<DnsCache
         else
         {  // send entry directly from cache
             const std::string logMsg("RequestProccessor get entry from cache");
-            Logger::instance().logInfo(logMsg);
-            #ifndef NDEBUG
+            Logger::logInfo(logMsg);
             Logger::logToStdout(logMsg);
-            #endif
+
             auto response = DNSResponse(DNSHeader::RCode::NoError, query, entry);
             bytesWritten = response.write(responseBuffer);
 
@@ -161,27 +149,22 @@ void Server::requestProcessor(Server::RequestData data, std::shared_ptr<DnsCache
 
     } catch (DNSException& e) {
         const std::string logMsg(std::string("RequestProccessor Caught DNS Exception: ") + e.what());
-        Logger::instance().logError(logMsg);
-        #ifndef NDEBUG
+        Logger::logError(logMsg);
         Logger::logToStdout(logMsg);
-        #endif
+
         auto response = DNSResponse(e.code, e.id);
         char responseBuffer[BUFF_SIZE];
         int bytesWritten = response.write(responseBuffer);
         int result = sendto(data.sockFD, responseBuffer, bytesWritten, 0, (struct sockaddr*) &data.clientAddr, sizeof(data.clientAddr));
         if (result == -1)
         {
-            const std::string logMsg(std::string( "RequestProccessor Error sending error responce to client"));
-            Logger::instance().logError(logMsg);
-            #ifndef NDEBUG
+            const std::string logMsg(std::string("RequestProccessor Error sending error responce to client"));
+            Logger::logError(logMsg);
             Logger::logToStdout(logMsg);
-            #endif
         }
     } catch (std::exception& e) {
-        const std::string logMsg(std::string( "RequestProccessor Caught Unhandled Exception: ") + e.what());
-        Logger::instance().logError(logMsg);
-        #ifndef NDEBUG
+        const std::string logMsg(std::string("RequestProccessor Caught Unhandled Exception: ") + e.what());
+        Logger::logError(logMsg);
         Logger::logToStdout(logMsg);
-        #endif
     }
 }

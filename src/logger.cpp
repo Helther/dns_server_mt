@@ -13,9 +13,7 @@ Logger::Logger()
     fileHandle.open(logFileName, std::ios::app);  // create file if doesn't exist
     fileHandle.close();
     processingThread = std::thread(processLogRequests);
-    #ifndef NDEBUG
     Logger::logToStdout("Logger created");
-    #endif
 }
 
 Logger::~Logger()
@@ -33,13 +31,9 @@ Logger::~Logger()
         }
         fileHandle.close();
     } catch (std::exception& e) {
-        #ifndef NDEBUG
         logToStdout(std::string("Error when writin log file: ") + e.what());
-        #endif
     }
-    #ifndef NDEBUG
     Logger::logToStdout("Logger destroyed");
-    #endif
 }
 
 void Logger::processLogRequests() noexcept
@@ -55,9 +49,7 @@ void Logger::processLogRequests() noexcept
             Logger::instance().fileHandle.write(logMsg.data(), std::size(logMsg));
             Logger::instance().fileHandle.close();
         } catch (std::exception& e) {
-            #ifndef NDEBUG
             logToStdout(std::string("Error when writin log file: ") + e.what());
-            #endif
         }
     }
 }
@@ -83,12 +75,19 @@ Logger& Logger::instance()
     return instance;
 }
 
+void Logger::logToStdout(const std::string &msg) noexcept
+{
+    #ifndef NDEBUG
+    std::cout << getLogStr({LogLevel::DEBUG, msg, std::time(nullptr)}) << std::endl;
+    #endif
+}
+
 void Logger::logMessage(LogLevel level, const std::string& msg) noexcept
 {
-    if (shouldLogLevel(level))
+    if (instance().shouldLogLevel(level))
     {
         LogTask task{level, msg, std::time(nullptr)};
-        logQueue.push(task);
+        instance().logQueue.push(task);
     }
 }
 

@@ -46,6 +46,8 @@ class Logger
 {
     // open file and set handle, start processing thread for log requests
     Logger();
+
+    bool shouldLogLevel(LogLevel level) const noexcept { return level <= this->level; }
     // wait for a task and write an entry to the file
     static void processLogRequests() noexcept;
     static std::string getLogStr(LogTask task) noexcept;
@@ -67,17 +69,15 @@ public:
 
     // lazy initialize the instance
     static Logger& instance();  // <- access through this
-    static void logToStdout(const std::string& msg) 
-        {std::cout << getLogStr({LogLevel::DEBUG, msg, std::time(nullptr)}) << std::endl; }
+    static void logToStdout(const std::string& msg) noexcept;
     void setLevel(LogLevel level) noexcept { this->level = level; }
     LogLevel getLevel() const noexcept { return level; }
-    bool shouldLogLevel(LogLevel level) const noexcept { return level <= this->level; }
 
-    // send log task to the process thread
-    void logMessage(LogLevel level, const std::string& msg) noexcept;
-    void logError(const std::string& msg) noexcept;
-    void logWarning(const std::string& msg) noexcept;
-    void logInfo(const std::string& msg) noexcept;
-    void logDebug(const std::string& msg) noexcept;
+    // send log task to the process thread for file logging
+    static void logMessage(LogLevel level, const std::string& msg) noexcept;
+    static void logError(const std::string& msg) noexcept;
+    static void logWarning(const std::string& msg) noexcept;
+    static void logInfo(const std::string& msg) noexcept;
+    static void logDebug(const std::string& msg) noexcept;
 
 };

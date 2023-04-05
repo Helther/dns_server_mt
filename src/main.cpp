@@ -103,10 +103,8 @@ int main(int argc, char* argv[])
     }
     catch (std::runtime_error& e)
     {
-        #ifndef NDEBUG
-        Logger::instance().logToStdout(e.what());
-        #endif
-        Logger::instance().logError(e.what());
+        Logger::logToStdout(e.what());
+        Logger::logError(e.what());
     }
     return 0;
 }
