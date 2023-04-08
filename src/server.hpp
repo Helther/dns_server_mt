@@ -8,6 +8,8 @@
 #include <memory>
 #include <iostream>
 #include <sstream>
+#include <boost/asio/thread_pool.hpp>
+
 
 inline constexpr int BUFF_SIZE = 512;
 inline constexpr int FWD_SOCK_TIMEOUT = 5; // in sec
@@ -44,6 +46,7 @@ private:
         Logger::logToStdout(logMsg);
     }
 
+    boost::asio::thread_pool thread_pool;  // make thread pool with size of available hardware concurrency x2
     std::shared_ptr<DnsCache> cache;
     sockaddr_in fwdServerAddr;
     struct sockaddr_in address;

@@ -10,6 +10,8 @@
 #include <cstring>
 #include <arpa/inet.h>
 #include <sstream>
+#include <boost/asio/post.hpp>
+#include <boost/bind/bind.hpp>
 
 
 Server::Server(std::shared_ptr<DnsCache> cachePtr, int port, const sockaddr_in &fwdSrvAddr, const std::string &fwdAddrStr, int fwdPort) :
@@ -30,6 +32,7 @@ Server::Server(std::shared_ptr<DnsCache> cachePtr, int port, const sockaddr_in &
 Server::~Server()
 {
     close(socketFD);
+    thread_pool.join();
 
     const std::string logMsg = "DNS Server shutdown";
     Logger::logInfo(logMsg);
@@ -54,7 +57,7 @@ void Server::run()
             inet_ntop(AF_INET, &clientAddr.sin_addr, clientAddrStr, INET_ADDRSTRLEN);
             std::array<char, BUFF_SIZE> arr;
             std::copy(buffer, buffer + BUFF_SIZE, arr.data());
-            std::thread(requestProcessor, RequestData{socketFD, arr, requestSize, clientAddr, fwdServerAddr}, cache).detach();
+            boost::asio::post(thread_pool, boost::bind(requestProcessor, RequestData{socketFD, arr, requestSize, clientAddr, fwdServerAddr}, cache));
             std::memset(buffer, 0, BUFF_SIZE);
             const std::string logMsg("DNS Server received request from " + std::string(clientAddrStr) + ", with size: " + std::to_string(requestSize));
             Logger::logInfo(logMsg);

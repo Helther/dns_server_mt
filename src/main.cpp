@@ -31,7 +31,7 @@ void handleServerInterrupt(int sig)
         if (sp->shouldSaveNewCacheFile())
             sp->saveCacheToFile();
     cache.reset();
-    // TODO server and cache objects do not actually destroy here
+    // TODO cache object doesn't actually destroy here
     exit(sig);
 }
 
@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
         // create cache
         cache = std::make_shared<DnsCache>(hosts);
         // start server
-        Server dnsServer(cache, port, fwdServerAddr, fwdAddr, fwdPort);
+        static Server dnsServer(cache, port, fwdServerAddr, fwdAddr, fwdPort);
         dnsServer.run();
     }
     catch (std::runtime_error& e)
