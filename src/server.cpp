@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include <thread>
 #include <cstring>
-#include <arpa/inet.h>
 #include <sstream>
 
 
@@ -50,15 +49,10 @@ void Server::run()
         try
         {
             int requestSize = recvfrom(socketFD, buffer, BUFF_SIZE, 0, (struct sockaddr*) &clientAddr, &clientAddrLen);
-            char clientAddrStr[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, &clientAddr.sin_addr, clientAddrStr, INET_ADDRSTRLEN);
             std::array<char, BUFF_SIZE> arr;
             std::copy(buffer, buffer + BUFF_SIZE, arr.data());
             std::thread(requestProcessor, RequestData{socketFD, arr, requestSize, clientAddr, fwdServerAddr}, cache).detach();
             std::memset(buffer, 0, BUFF_SIZE);
-            const std::string logMsg("DNS Server received request from " + std::string(clientAddrStr) + ", with size: " + std::to_string(requestSize));
-            Logger::logInfo(logMsg);
-            Logger::logToStdout(logMsg);
         } catch (std::exception& e) {
             const std::string logMsg(std::string("DNS Server Error receiving request") + e.what());
             Logger::logError(logMsg);
@@ -84,9 +78,10 @@ int Server::makeUdpSocket(const sockaddr_in &addr)
 void Server::requestProcessor(Server::RequestData data, std::shared_ptr<DnsCache> cache) noexcept
 {
     try {
+        RequestLogger logRequest(data);  // log when out of scope
         DNSQuery query(data.buffer.data(), data.size);
 
-        logMessage<DNSQuery>(query);
+        logRequest.addLogTask(LogLevel::DEBUG, getLogMessage(query));
 
         DnsEntry entry = cache->lookupEntry(query.getData().qName);
         uint64_t currentTime = DnsCache::getCurrentTimestamp();
@@ -95,9 +90,7 @@ void Server::requestProcessor(Server::RequestData data, std::shared_ptr<DnsCache
         if (entry.isEmpty() || ((currentTime - entry.lastUpdated > TIMEOUT_TIME) && !entry.preloaded))
         {  // if not found in cache or cache entry time-outed and is not preloaded from file
             // create socket for forward server and send the request
-            const std::string logMsg("RequestProccessor get entry from Forward Server");
-            Logger::logInfo(logMsg);
-            Logger::logToStdout(logMsg);
+            logRequest.addLogTask(LogLevel::INFO, "RequestProccessor get entry from Forward Server");
 
             int fwdSock = socket(AF_INET, SOCK_DGRAM, 0);
             if (fwdSock <= 0)
@@ -124,7 +117,7 @@ void Server::requestProcessor(Server::RequestData data, std::shared_ptr<DnsCache
             bytesWritten = fwdResponse.write(responseBuffer);
 
             logMessage<DNSResponse>(fwdResponse);
-
+            logRequest.addLogTask(LogLevel::DEBUG, getLogMessage(fwdResponse));
             // update cache with one answer
             const auto newData = fwdResponse.getData();
             if (newData.rData.empty())
@@ -134,14 +127,12 @@ void Server::requestProcessor(Server::RequestData data, std::shared_ptr<DnsCache
         }
         else
         {  // send entry directly from cache
-            const std::string logMsg("RequestProccessor get entry from cache");
-            Logger::logInfo(logMsg);
-            Logger::logToStdout(logMsg);
+            logRequest.addLogTask(LogLevel::INFO, "RequestProccessor get entry from cache");
 
             auto response = DNSResponse(DNSHeader::RCode::NoError, query, entry);
             bytesWritten = response.write(responseBuffer);
 
-            logMessage<DNSResponse>(response);
+            logRequest.addLogTask(LogLevel::DEBUG, getLogMessage(response));
         }
         int result = sendto(data.sockFD, responseBuffer, bytesWritten, 0, (struct sockaddr*) &data.clientAddr, sizeof(data.clientAddr));
         if (result == -1)

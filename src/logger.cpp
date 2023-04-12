@@ -1,4 +1,5 @@
 #include "logger.hpp"
+#include "queue.hpp"
 #include <bits/types/time_t.h>
 #include <cstring>
 #include <fstream>
@@ -19,19 +20,19 @@ Logger::Logger()
 Logger::~Logger()
 {
     keepProcessing = false;
-    Logger::instance().logInfo("logger shutdown");  // TODO called to wake up processThread to exit main loop, think of something better
+    Logger::instance().logInfo("Logger shutdown");  // TODO called to wake up processThread to exit main loop, think of something better
     processingThread.join();
     try
     {
         fileHandle.open(logFileName, std::ios::app);
-        while (auto task = logQueue.try_pop())  // finish logging unprocessed tasks after thread shutdown
+        while (auto task = logQueue.dequeue())  // finish logging unprocessed tasks after thread shutdown
         {
             const std::string logMsg = getLogStr(*task);
             Logger::instance().fileHandle.write(logMsg.data(), std::size(logMsg));
         }
         fileHandle.close();
     } catch (std::exception& e) {
-        logToStdout(std::string("Error when writin log file: ") + e.what());
+        logToStdout(std::string("Logger Error when writin log file: ") + e.what());
     }
     Logger::logToStdout("Logger destroyed");
 }
@@ -40,21 +41,22 @@ void Logger::processLogRequests() noexcept
 {
     while(Logger::instance().keepProcessing)
     {
-        LogTask task;
-        Logger::instance().logQueue.wait_pop(task);
-        const std::string logMsg = getLogStr(task);
         try
         {
-            Logger::instance().fileHandle.open(logFileName, std::ios::app);
-            Logger::instance().fileHandle.write(logMsg.data(), std::size(logMsg));
-            Logger::instance().fileHandle.close();
+            if (std::unique_ptr<LogTask> task = Logger::instance().logQueue.waitDequeue())
+            {
+                const std::string logMsg = getLogStr(*task);
+                Logger::instance().fileHandle.open(logFileName, std::ios::app);
+                Logger::instance().fileHandle.write(logMsg.data(), std::size(logMsg));
+                Logger::instance().fileHandle.close();
+            }
         } catch (std::exception& e) {
-            logToStdout(std::string("Error when writin log file: ") + e.what());
+            logToStdout(std::string("Logger Error when writin log file: ") + e.what());
         }
     }
 }
 
-std::string Logger::getLogStr(LogTask task) noexcept
+std::string Logger::getLogStr(const LogTask& task) noexcept
 {
     std::ostringstream ss;
     ss << getCurrentTimeStr(task.time) << separator << PROJECT_NAME << separator << levelNames.at(task.level) << separator << task.msg << '\n';
@@ -87,7 +89,12 @@ void Logger::logMessage(LogLevel level, const std::string& msg) noexcept
     if (instance().shouldLogLevel(level))
     {
         LogTask task{level, msg, std::time(nullptr)};
-        instance().logQueue.push(task);
+        try
+        {
+            instance().logQueue.enqueue(task);
+        } catch (std::exception& e) {
+            logToStdout(std::string("Logger Error adding log message: ") + e.what());
+        }
     }
 }
 
@@ -109,4 +116,17 @@ void Logger::logInfo(const std::string& msg) noexcept
 void Logger::logDebug(const std::string& msg) noexcept
 {
     logMessage(LogLevel::DEBUG, msg);
+}
+
+void Logger::logTask(const LogTask& task) noexcept
+{
+    if (instance().shouldLogLevel(task.level))
+    {
+        try
+        {
+            instance().logQueue.enqueue(task);
+        } catch (std::exception& e) {
+            logToStdout(std::string("Logger Error adding log message: ") + e.what());
+        }
+    }
 }

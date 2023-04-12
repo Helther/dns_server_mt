@@ -12,5 +12,5 @@ add_executable(${project_name} ${SOURCES} ${HEADERS} ${QT_CUSTOM})
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-target_link_libraries(${project_name} PRIVATE Threads::Threads)
+target_link_libraries(${project_name} PRIVATE Threads::Threads atomic)
 target_compile_definitions(${project_name} PRIVATE -DPROJECT_NAME="${project_name}" -DPROJECT_LOG_NAME="${project_name}.log")

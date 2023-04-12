@@ -50,14 +50,14 @@ class Logger
     bool shouldLogLevel(LogLevel level) const noexcept { return level <= this->level; }
     // wait for a task and write an entry to the file
     static void processLogRequests() noexcept;
-    static std::string getLogStr(LogTask task) noexcept;
+    static std::string getLogStr(const LogTask& task) noexcept;
     static std::string getCurrentTimeStr(time_t currTime) noexcept;
     
     std::ofstream fileHandle;
     LogLevel level = LogLevel::DEBUG;
     static constexpr auto logFileName = PROJECT_LOG_NAME;
     static constexpr auto separator = " - ";
-    ThreadSafeQueue<LogTask> logQueue;
+    LockFreeQueue<LogTask> logQueue;
     std::thread processingThread;
     std::atomic_bool keepProcessing{true};
 
@@ -66,6 +66,8 @@ public:
     ~Logger();
     Logger(const Logger&) = delete;
     Logger& operator=(Logger&) = delete;
+    Logger(Logger&&) = delete;
+    Logger& operator=(Logger&&) = delete;
 
     // lazy initialize the instance
     static Logger& instance();  // <- access through this
@@ -79,5 +81,5 @@ public:
     static void logWarning(const std::string& msg) noexcept;
     static void logInfo(const std::string& msg) noexcept;
     static void logDebug(const std::string& msg) noexcept;
-
+    static void logTask(const LogTask& task) noexcept;
 };

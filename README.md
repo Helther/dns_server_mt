@@ -1,6 +1,7 @@
 # DNS Server, Multithreaded
 Is a RFC 1035 compatible Domain Name System Server, that implements concurrent query processing
-and non-blocking cache read access, if available.
+and non-blocking cache read access, implemented using std::shared_mutex. File logger that uses lock-free
+queue to add log messages and a dedicated thread to write to file.
 ## Usage
 Binary has 3 positional arguments:
 ```
@@ -23,7 +24,7 @@ $ dns_server 53 "hosts" "127.0.0.1:53"
  * Implements DNS caching. Cache data is updated on timeout(ttl)
  * Ability to preload cache from file in format of system [hosts example](hosts). These entries won't be updated on timeout
  * Supports forwarding queries to Forward Server, hence related argument option
- * File logging from a dedicated thread
+ * File logging from a dedicated thread with lock-free queue
 
 ## Dependencies
 1. A C++ compiler that supports C++20 standard.
