@@ -163,9 +163,9 @@ public:
         }
     }
 
-    void enqueue(const T& newVal)
+    void enqueue(T&& newVal)
     {  // can potentially throw
-        std::unique_ptr<T> newData = std::make_unique<T>(newVal);
+        std::unique_ptr<T> newData = std::make_unique<T>(std::move(newVal));
         std::unique_ptr<Node> newNode = std::make_unique<Node>();
         CountedPtrNode newNext{1, newNode.get()};
         CountedPtrNode oldTail = tail.load(std::memory_order_relaxed);
@@ -218,7 +218,6 @@ public:
             if (ptr == tail.load().ptr)
             {  // got empty queue, update atomic bool, don't notify waitDequeue, because it's empty
                 isEmpty = true;
-                //isEmpty.notify_one();
                 ptr->releaseInternal();
                 return std::unique_ptr<T>();
             }
@@ -234,8 +233,8 @@ public:
         }
     }
 
-    /// can return empty ptr
-    std::unique_ptr<T> waitDequeue()
+    /// can return empty ptr, use only with single consumer
+    std::unique_ptr<T> waitDequeue() noexcept
     {
         isEmpty.wait(true);
         return dequeue();

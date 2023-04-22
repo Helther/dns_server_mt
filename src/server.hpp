@@ -3,6 +3,7 @@
 #include "dnscache.hpp"
 #include "dnsmessage.hpp"
 #include "logger.hpp"
+#include "threadpool.hpp"
 #include <exception>
 #include <netinet/in.h>
 #include <array>
@@ -16,6 +17,7 @@
 
 inline constexpr int BUFF_SIZE = 512;
 inline constexpr int FWD_SOCK_TIMEOUT = 5; // in sec
+inline constexpr int THREAD_POOL_TASK_POLL_LATENCY = 10000; // in microsec
 
 class Server
 {
@@ -63,14 +65,14 @@ public:
         int requestSize;
     };
 
-    Server(std::shared_ptr<DnsCache> cachePtr, int port, const sockaddr_in& fwdSrvAddr, const std::string& fwdAddrStr, int fwdPort);
+    Server(DnsCache* cachePtr, int port, const sockaddr_in& fwdSrvAddr, const std::string& fwdAddrStr, int fwdPort);
     ~Server();
 
     void run();
     static int makeUdpSocket(const struct sockaddr_in& addr);
 
 private:
-    static void requestProcessor(RequestData data, std::shared_ptr<DnsCache> cache) noexcept;
+    static void requestProcessor(RequestData data, DnsCache& cache) noexcept;
 
     template<typename Msg>
     static void logMessage(const Msg& msg) noexcept
@@ -89,8 +91,9 @@ private:
         return logMsg.append(ss.str());
     }
 
-    std::shared_ptr<DnsCache> cache;
+    DnsCache* cache;
     sockaddr_in fwdServerAddr;
     struct sockaddr_in address;
     int socketFD;
+    ThreadPool threadPool;
 };

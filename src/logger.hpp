@@ -81,5 +81,5 @@ public:
     static void logWarning(const std::string& msg) noexcept;
     static void logInfo(const std::string& msg) noexcept;
     static void logDebug(const std::string& msg) noexcept;
-    static void logTask(const LogTask& task) noexcept;
+    static void logTask(LogTask task) noexcept;
 };

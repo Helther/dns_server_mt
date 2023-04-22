@@ -24,6 +24,7 @@ $ dns_server 53 "hosts" "127.0.0.1:53"
  * Implements DNS caching. Cache data is updated on timeout(ttl)
  * Ability to preload cache from file in format of system [hosts example](hosts). These entries won't be updated on timeout
  * Supports forwarding queries to Forward Server, hence related argument option
+ * Query processing thread pool with lock-free task queue
  * File logging from a dedicated thread with lock-free queue
 
 ## Dependencies

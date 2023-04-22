@@ -1,6 +1,7 @@
 #include "server.hpp"
 #include "dnsexception.hpp"
 #include "logger.hpp"
+#include "threadpool.hpp"
 #include <exception>
 #include <string>
 #include <sys/socket.h>
@@ -9,10 +10,11 @@
 #include <thread>
 #include <cstring>
 #include <sstream>
+#include <functional>
 
 
-Server::Server(std::shared_ptr<DnsCache> cachePtr, int port, const sockaddr_in &fwdSrvAddr, const std::string &fwdAddrStr, int fwdPort) :
-    cache(cachePtr), fwdServerAddr(fwdSrvAddr)
+Server::Server(DnsCache* cachePtr, int port, const sockaddr_in &fwdSrvAddr, const std::string &fwdAddrStr, int fwdPort) :
+    cache(cachePtr), fwdServerAddr(fwdSrvAddr), threadPool(std::chrono::microseconds(THREAD_POOL_TASK_POLL_LATENCY))
 {
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
@@ -51,7 +53,7 @@ void Server::run()
             int requestSize = recvfrom(socketFD, buffer, BUFF_SIZE, 0, (struct sockaddr*) &clientAddr, &clientAddrLen);
             std::array<char, BUFF_SIZE> arr;
             std::copy(buffer, buffer + BUFF_SIZE, arr.data());
-            std::thread(requestProcessor, RequestData{socketFD, arr, requestSize, clientAddr, fwdServerAddr}, cache).detach();
+            threadPool.submit(&requestProcessor, RequestData{socketFD, arr, requestSize, clientAddr, fwdServerAddr}, std::ref(*cache));
             std::memset(buffer, 0, BUFF_SIZE);
         } catch (std::exception& e) {
             const std::string logMsg(std::string("DNS Server Error receiving request") + e.what());
@@ -75,7 +77,7 @@ int Server::makeUdpSocket(const sockaddr_in &addr)
     return socketFD;
 }
 
-void Server::requestProcessor(Server::RequestData data, std::shared_ptr<DnsCache> cache) noexcept
+void Server::requestProcessor(Server::RequestData data, DnsCache& cache) noexcept
 {
     try {
         RequestLogger logRequest(data);  // log when out of scope
@@ -83,7 +85,7 @@ void Server::requestProcessor(Server::RequestData data, std::shared_ptr<DnsCache
 
         logRequest.addLogTask(LogLevel::DEBUG, getLogMessage(query));
 
-        DnsEntry entry = cache->lookupEntry(query.getData().qName);
+        DnsEntry entry = cache.lookupEntry(query.getData().qName);
         uint64_t currentTime = DnsCache::getCurrentTimestamp();
         char responseBuffer[BUFF_SIZE];
         int bytesWritten = 0;
@@ -123,7 +125,7 @@ void Server::requestProcessor(Server::RequestData data, std::shared_ptr<DnsCache
             if (newData.rData.empty())
                 throw DNSException(DNSHeader::ServerFail, query.getId(), "Invalid response from Forward Server");
 
-            cache->updateOrInsertEntry(newData.name, DnsEntry{newData.rData.front(), currentTime, false});
+            cache.updateOrInsertEntry(newData.name, DnsEntry{newData.rData.front(), currentTime, false});
         }
         else
         {  // send entry directly from cache

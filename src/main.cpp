@@ -22,16 +22,9 @@ static constexpr std::array<int, 6> SIGNALS_TO_INTERRUPT = {
     SIGTERM
 };
 
-std::shared_ptr<DnsCache> cache;
 
 void handleServerInterrupt(int sig)
 {
-    std::weak_ptr<DnsCache> wptr = cache;
-    if (auto sp = wptr.lock())
-        if (sp->shouldSaveNewCacheFile())
-            sp->saveCacheToFile();
-    cache.reset();
-    // cache object does not actually destroy here
     exit(sig);
 }
 
@@ -95,10 +88,10 @@ int main(int argc, char* argv[])
             throw std::runtime_error("Invalid arguments. " + std::string(e.what()) + '\n' + usage);
         }
 
-        // create cache
-        cache = std::make_shared<DnsCache>(hosts);
+        // create static cache
+        static DnsCache cache(hosts);
         // start server by making static instance, so it will destroy gracefuly during signal handling
-        static Server dnsServer(cache, port, fwdServerAddr, fwdAddr, fwdPort);
+        static Server dnsServer(&cache, port, fwdServerAddr, fwdAddr, fwdPort);
         dnsServer.run();
     }
     catch (std::runtime_error& e)

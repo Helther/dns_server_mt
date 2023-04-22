@@ -20,7 +20,7 @@ Logger::Logger()
 Logger::~Logger()
 {
     keepProcessing = false;
-    Logger::instance().logInfo("Logger shutdown");  // TODO called to wake up processThread to exit main loop, think of something better
+    Logger::instance().logInfo("Logger shutdown");  // also called to wake up processThread to exit main loop
     processingThread.join();
     try
     {
@@ -91,7 +91,7 @@ void Logger::logMessage(LogLevel level, const std::string& msg) noexcept
         LogTask task{level, msg, std::time(nullptr)};
         try
         {
-            instance().logQueue.enqueue(task);
+            instance().logQueue.enqueue(std::move(task));
         } catch (std::exception& e) {
             logToStdout(std::string("Logger Error adding log message: ") + e.what());
         }
@@ -118,13 +118,13 @@ void Logger::logDebug(const std::string& msg) noexcept
     logMessage(LogLevel::DEBUG, msg);
 }
 
-void Logger::logTask(const LogTask& task) noexcept
+void Logger::logTask(LogTask task) noexcept
 {
     if (instance().shouldLogLevel(task.level))
     {
         try
         {
-            instance().logQueue.enqueue(task);
+            instance().logQueue.enqueue(std::move(task));
         } catch (std::exception& e) {
             logToStdout(std::string("Logger Error adding log message: ") + e.what());
         }
