@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
         static DnsCache cache(hosts);
         // start server by making static instance, so it will destroy gracefuly during signal handling
         static Server dnsServer(&cache, port, fwdServerAddr, fwdAddr, fwdPort);
-        dnsServer.run();
+        //dnsServer.run();
     }
     catch (std::runtime_error& e)
     {

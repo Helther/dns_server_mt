@@ -52,12 +52,13 @@ class Logger
     static void processLogRequests() noexcept;
     static std::string getLogStr(const LogTask& task) noexcept;
     static std::string getCurrentTimeStr(time_t currTime) noexcept;
+    static void addLogTask(LogTask&& task) noexcept;
     
     std::ofstream fileHandle;
     LogLevel level = LogLevel::DEBUG;
     static constexpr auto logFileName = PROJECT_LOG_NAME;
     static constexpr auto separator = " - ";
-    LockFreeQueue<LogTask> logQueue;
+    LockFreeDequeue<LogTask> logQueue;
     std::thread processingThread;
     std::atomic_bool keepProcessing{true};
 

@@ -22,10 +22,13 @@ Logger::~Logger()
     keepProcessing = false;
     Logger::instance().logInfo("Logger shutdown");  // also called to wake up processThread to exit main loop
     processingThread.join();
+    Logger::instance().logInfo("1");
+    Logger::instance().logInfo("2");
+    Logger::instance().logInfo("3");
     try
     {
         fileHandle.open(logFileName, std::ios::app);
-        while (auto task = logQueue.dequeue())  // finish logging unprocessed tasks after thread shutdown
+        while (auto task = logQueue.dequeueBack())  // finish logging unprocessed tasks after thread shutdown
         {
             const std::string logMsg = getLogStr(*task);
             Logger::instance().fileHandle.write(logMsg.data(), std::size(logMsg));
@@ -43,7 +46,7 @@ void Logger::processLogRequests() noexcept
     {
         try
         {
-            if (std::unique_ptr<LogTask> task = Logger::instance().logQueue.waitDequeue())
+            if (std::unique_ptr<LogTask> task = Logger::instance().logQueue.dequeueFront())
             {
                 const std::string logMsg = getLogStr(*task);
                 Logger::instance().fileHandle.open(logFileName, std::ios::app);
@@ -71,6 +74,16 @@ std::string Logger::getCurrentTimeStr(time_t currTime) noexcept
     return timeString;
 }
 
+void Logger::addLogTask(LogTask &&task) noexcept
+{
+    try
+    {
+        instance().logQueue.enqueueFront(std::move(task));
+    } catch (std::exception& e) {
+        logToStdout(std::string("Logger Error adding log message: ") + e.what());
+    }
+}
+
 Logger& Logger::instance()
 {
     static Logger instance;
@@ -89,12 +102,7 @@ void Logger::logMessage(LogLevel level, const std::string& msg) noexcept
     if (instance().shouldLogLevel(level))
     {
         LogTask task{level, msg, std::time(nullptr)};
-        try
-        {
-            instance().logQueue.enqueue(std::move(task));
-        } catch (std::exception& e) {
-            logToStdout(std::string("Logger Error adding log message: ") + e.what());
-        }
+        addLogTask(std::move(task));
     }
 }
 
@@ -121,12 +129,5 @@ void Logger::logDebug(const std::string& msg) noexcept
 void Logger::logTask(LogTask task) noexcept
 {
     if (instance().shouldLogLevel(task.level))
-    {
-        try
-        {
-            instance().logQueue.enqueue(std::move(task));
-        } catch (std::exception& e) {
-            logToStdout(std::string("Logger Error adding log message: ") + e.what());
-        }
-    }
+        addLogTask(std::move(task));
 }
